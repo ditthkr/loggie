@@ -12,6 +12,14 @@ type Logger interface {
 
 type ctxKey struct{}
 
+var defaultLogger Logger = &noopLogger{}
+
+type noopLogger struct{}
+
+func (n *noopLogger) Info(msg string, fields ...any)  {}
+func (n *noopLogger) Error(msg string, fields ...any) {}
+func (n *noopLogger) With(fields ...any) Logger       { return n }
+
 // WithLogger stores the given logger inside the context.
 // It can be retrieved later using FromContext.
 func WithLogger(ctx context.Context, logger Logger) context.Context {
@@ -36,4 +44,10 @@ func FromContext(ctx context.Context) Logger {
 		kv = append(kv, k, v)
 	}
 	return logger.With(kv...)
+}
+
+// DefaultLogger returns the internal fallback logger used when no logger is found.
+// This logger does nothing and is safe to call anywhere.
+func DefaultLogger() Logger {
+	return defaultLogger
 }
