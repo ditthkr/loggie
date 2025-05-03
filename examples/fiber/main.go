@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"github.com/ditthkr/loggie"
-	"github.com/ditthkr/loggie/middleware"
+	"github.com/ditthkr/loggie/middleware/fiberlog"
 	"github.com/gofiber/fiber/v3"
 	"go.uber.org/zap"
 	"net/http"
@@ -14,7 +14,7 @@ func main() {
 	defer rawLogger.Sync()
 
 	app := fiber.New()
-	app.Use(middleware.FiberZapMiddleware(rawLogger))
+	app.Use(fiberlog.Middleware(&loggie.ZapLogger{L: rawLogger}))
 
 	app.Get("/ping", func(c fiber.Ctx) error {
 		ctx := c.Context()

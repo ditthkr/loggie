@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"github.com/ditthkr/loggie"
-	"github.com/ditthkr/loggie/middleware"
+	"github.com/ditthkr/loggie/middleware/echolog"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 	"net/http"
@@ -14,7 +14,7 @@ func main() {
 	defer rawLogger.Sync()
 
 	e := echo.New()
-	e.Use(middleware.EchoZapMiddleware(rawLogger))
+	e.Use(echolog.Middleware(&loggie.ZapLogger{L: rawLogger}))
 
 	e.GET("/ping", func(c echo.Context) error {
 		ctx := c.Request().Context()

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"github.com/ditthkr/loggie"
-	"github.com/ditthkr/loggie/middleware"
+	"github.com/ditthkr/loggie/middleware/ginlog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -15,7 +15,7 @@ func main() {
 	defer rawLogger.Sync()
 
 	r := gin.Default()
-	r.Use(middleware.GinZapMiddleware(rawLogger))
+	r.Use(ginlog.Middleware(&loggie.ZapLogger{L: rawLogger}))
 
 	r.GET("/ping", func(c *gin.Context) {
 		ctx := c.Request.Context()
