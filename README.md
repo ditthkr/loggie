@@ -1,21 +1,27 @@
 # loggie 🧠⚡️ — Context-Aware Logger for Go
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/ditthkr/loggie.svg)](https://pkg.go.dev/github.com/ditthkr/loggie)
-[![Go Report Card](https://goreportcard.com/badge/github.com/ditthkr/loggie)](https://goreportcard.com/report/github.com/ditthkr/loggie)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+Context-aware, pluggable logger for Go web applications.  
+No more passing logger through every function — just use `context.Context`.
 
-> Simple, structured, and traceable logging via `context.Context` — for modern Go backend services.
+---
+
+## 🚀 What is loggie?
+
+`loggie` helps you embed a structured logger inside `context.Context`, so you can log from any layer — service, repository, or handler — with a consistent `trace_id`, `user_id`, or any custom field.
+
+It supports Zap (now), and is extensible to Logrus, Slog, and more.
 
 ---
 
 ## ✨ Features
 
-- ✅ Context-aware logging (`logger.FromContext(ctx)`)
-- 🧵 Auto generate `trace_id` per request
-- 🏷 Attach dynamic custom fields (`user_id`, `order_id`, etc.)
-- 🔌 Plug-and-play middleware for **Gin**, **Fiber**, and **Echo**
-- 🔧 Compatible with `context.WithTimeout`, `WithCancel`
-- 📦 Designed for use with Zap (Logrus / slog coming soon)
+✅ Structured logging with `context.Context`  
+✅ Auto-generated `trace_id` per request  
+✅ Custom fields via `loggie.WithCustomField()`  
+✅ Middleware for Fiber / Gin / Echo  
+✅ Pluggable backends (Zap, Logrus, Slog, etc.)  
+✅ Fallback logger included (safe in any context)  
+✅ Ready for Fx lifecycle and timeout-aware `context.WithTimeout`
 
 ---
 
@@ -27,108 +33,150 @@ go get github.com/ditthkr/loggie
 
 ---
 
-## 🚀 Quick Start
+## 🧱 Architecture
 
-### 🔗 Gin
+```txt
+               ┌────────────────────┐
+               │ context.Context    │
+               └────────┬───────────┘
+                        │
+                ┌───────▼────────┐
+                │ loggie.Logger  │◄── (interface)
+                └───────┬────────┘
+                        │
+        ┌───────────────┼────────────────┐
+        ▼               ▼                ▼
+  ZapLogger        LogrusLogger       SlogLogger
+(implemented)     (planned)          (planned)
 
-```go
-r := gin.Default()
-r.Use(middleware.GinZapMiddleware(zapLogger))
-
-r.GET("/ping", func(c *gin.Context) {
-	ctx := loggie.WithCustomField(c.Request.Context(), "user_id", 123)
-	log := loggie.FromContext(ctx)
-	log.Info("hello gin")
-	c.JSON(200, gin.H{"msg": "pong"})
-})
 ```
 
 ---
 
-### ⚡ Fiber
+## 🔌 Logger Interface
 
 ```go
-app := fiber.New()
-app.Use(middleware.FiberZapMiddleware(zapLogger))
-
-app.Get("/ping", func(c fiber.Ctx) error {
-	ctx := loggie.WithCustomField(c.Context(), "user_id", 123)
-	log := loggie.FromContext(ctx)
-	log.Info("hello fiber")
-	return c.JSON(fiber.Map{"msg": "pong"})
-})
+type Logger interface {
+    Info(msg string, fields ...any)
+    Error(msg string, fields ...any)
+    With(fields ...any) Logger
+}
 ```
+
+> You can plug any logger backend by implementing this interface.
 
 ---
 
-### 🎯 Echo
+## ⚙️ Middleware Usage
+
+### Fiber + Zap (fully working)
 
 ```go
-e := echo.New()
-e.Use(middleware.EchoZapMiddleware(zapLogger))
+import (
+    "github.com/ditthkr/loggie"
+    "github.com/ditthkr/loggie/middleware/fiberlog"
+    "go.uber.org/zap"
+    "github.com/gofiber/fiber/v3"
+)
 
-e.GET("/ping", func(c echo.Context) error {
-	ctx := loggie.WithCustomField(c.Request().Context(), "role", "admin")
-	log := loggie.FromContext(ctx)
-	log.Info("hello echo")
-	return c.JSON(200, map[string]string{"msg": "pong"})
-})
+func main() {
+    rawLogger, _ := zap.NewProduction()
+    defer rawLogger.Sync()
+
+    adapter := &loggie.ZapLogger{L: rawLogger}
+    app := fiber.New()
+    app.Use(fiberlog.Middleware(adapter))
+
+    app.Get("/ping", func(c *fiber.Ctx) error {
+        log := loggie.FromContext(c.UserContext())
+        log.Info("Ping received", "path", c.Path())
+        return c.SendString("pong")
+    })
+
+    app.Listen(":8080")
+}
 ```
 
----
-
-## 🔍 Log Output (structured JSON)
+🧪 Sample Log Output:
 
 ```json
 {
   "level": "info",
-  "msg": "hello gin",
-  "trace_id": "123e4567-e89b-12d3-a456-426614174000",
-  "user_id": 123
+  "msg": "Ping received",
+  "trace_id": "b4a3f5a0...",
+  "path": "/ping"
 }
 ```
 
 ---
 
-## 🧪 WithTimeout / Cancel
-
-`loggie` works seamlessly with `context.WithTimeout` or `context.WithCancel`.
+## ✍️ Custom Fields (e.g. user\_id)
 
 ```go
-ctx := loggie.WithCustomField(r.Context(), "user_id", 999)
-ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-defer cancel()
+ctx = loggie.WithCustomField(ctx, "user_id", 42)
 
 log := loggie.FromContext(ctx)
-log.Info("processing with timeout")
+log.Info("Order created")
+```
+
+📤 Output:
+
+```json
+{
+  "msg": "Order created",
+  "trace_id": "abc-xyz",
+  "user_id": 42
+}
 ```
 
 ---
 
-## 🧱 Custom Fields
+## 🧰 Utilities
 
-Attach custom metadata across service layers without rewriting logger or trace logic.
+| Function                           | Purpose                       |
+|------------------------------------| ----------------------------- |
+| `FromContext(ctx)`                 | Retrieves logger from context |
+| `WithLogger(ctx, logger)`          | Injects a logger              |
+| `WithTraceId(ctx)`                 | Adds `trace_id` to context    |
+| `TraceId(ctx)`                     | Retrieves trace\_id           |
+| `WithCustomField(ctx, key, value)` | Adds any structured field     |
+| `DefaultLogger()`                  | Returns no-op fallback logger |
+
+---
+
+## 📁 Available Middleware
+
+| Framework | Import Path                                     | Function                |
+| --------- | ----------------------------------------------- | ----------------------- |
+| Fiber     | `github.com/ditthkr/loggie/middleware/fiberlog` | `fiberlog.Middleware()` |
+| Gin       | `github.com/ditthkr/loggie/middleware/ginlog`   | `ginlog.Middleware()`   |
+| Echo      | `github.com/ditthkr/loggie/middleware/echolog`  | `echolog.Middleware()`  |
+
+> All middlewares are generic and accept any `loggie.Logger`.
+
+---
+
+## 🔌 Current and Planned Logger Adapters
+
+| Logger | Package / Status        |
+| ------ | ----------------------- |
+| Zap    | ✅ `loggie.ZapLogger`    |
+| Logrus | 🕓 In progress          |
+| Slog   | 🕓 Planned for Go 1.21+ |
+
+---
+
+## 🧪 Testing & Fallbacks
+
+Even without injecting a logger, `loggie` will still work with a **safe no-op fallback**:
 
 ```go
-ctx = loggie.WithCustomField(ctx, "order_id", "ORD-789")
-log := loggie.FromContext(ctx)
-log.Info("step 1") // order_id will appear
+log := loggie.FromContext(context.Background())
+log.Info("This is safe even without a logger")
 ```
 
 ---
 
-## 📌 Roadmap
+## 📃 License
 
-* [x] Gin Middleware
-* [x] Fiber v3 Middleware
-* [x] Echo Middleware
-* [ ] Adapter for `logrus`
-* [ ] Adapter for `slog` (Go 1.21+)
-* [ ] Tracing integration (OpenTelemetry)
-* [ ] Unit tests & benchmarks
-
----
-
-## 📄 License
-
-MIT License © 2025 [DITTHKR](https://github.com/ditthkr)
+MIT © 2025 [@ditthkr](https://github.com/ditthkr)
