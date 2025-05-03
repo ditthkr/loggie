@@ -12,7 +12,12 @@ import (
 
 func main() {
 	rawLogger, _ := zap.NewProduction()
-	defer rawLogger.Sync()
+	defer func(rawLogger *zap.Logger) {
+		err := rawLogger.Sync()
+		if err != nil {
+			panic(err)
+		}
+	}(rawLogger)
 
 	r := gin.Default()
 	r.Use(ginlog.Middleware(&loggie.ZapLogger{L: rawLogger}))
@@ -36,7 +41,10 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": "pong"})
 	})
 
-	r.Run()
+	err := r.Run()
+	if err != nil {
+		return
+	}
 }
 
 func processPing(ctx context.Context) error {
@@ -55,7 +63,7 @@ func processPing(ctx context.Context) error {
 func queryDatabase(ctx context.Context) error {
 	log := loggie.FromContext(ctx)
 
-	log.Info("querying database", "sql", "SELECT * FROM pings LIMIT 1")
+	log.Info("querying database", "sql", "_SELECT * FROM pings LIMIT 1")
 
 	return nil
 }
