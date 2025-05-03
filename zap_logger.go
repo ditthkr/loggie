@@ -2,8 +2,6 @@ package loggie
 
 import "go.uber.org/zap"
 
-var defaultLogger Logger = &ZapLogger{L: zap.NewNop()}
-
 type ZapLogger struct {
 	L *zap.Logger
 }
