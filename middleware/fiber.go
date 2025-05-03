@@ -8,7 +8,7 @@ import (
 
 func FiberZapMiddleware(logger *zap.Logger) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		ctx, traceId := loggie.WithTraceID(c.Context())
+		ctx, traceId := loggie.WithTraceId(c.Context())
 
 		ctx = loggie.WithLogger(ctx, &loggie.ZapLogger{
 			L: logger.With(zap.String("trace_id", traceId)),

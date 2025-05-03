@@ -9,7 +9,7 @@ import (
 func EchoZapMiddleware(logger *zap.Logger) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			ctx, traceId := loggie.WithTraceID(c.Request().Context())
+			ctx, traceId := loggie.WithTraceId(c.Request().Context())
 
 			ctx = loggie.WithLogger(ctx, &loggie.ZapLogger{
 				L: logger.With(zap.String("trace_id", traceId)),

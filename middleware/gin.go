@@ -8,7 +8,7 @@ import (
 
 func GinZapMiddleware(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx, traceId := loggie.WithTraceID(c.Request.Context())
+		ctx, traceId := loggie.WithTraceId(c.Request.Context())
 
 		ctx = loggie.WithLogger(ctx, &loggie.ZapLogger{
 			L: logger.With(zap.String("trace_id", traceId)),
