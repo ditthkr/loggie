@@ -15,6 +15,7 @@ func Middleware(logger loggie.Logger) fiber.Handler {
 		ctx, traceId := loggie.WithTraceId(c.Context())
 		ctx = loggie.WithLogger(ctx, logger.With("trace_id", traceId))
 		c.SetContext(ctx)
+		c.Set("X-Trace-Id", traceId)
 		return c.Next()
 	}
 }
