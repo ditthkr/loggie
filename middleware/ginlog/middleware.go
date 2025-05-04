@@ -13,7 +13,7 @@ func Middleware(logger loggie.Logger) gin.HandlerFunc {
 	}
 	return func(c *gin.Context) {
 		ctx, traceId := loggie.WithTraceId(c.Request.Context())
-		ctx = loggie.WithLogger(ctx, logger.With("trace_id", traceId))
+		ctx = loggie.WithLogger(ctx, logger)
 		c.Request = c.Request.WithContext(ctx)
 		c.Header("X-Trace-Id", traceId)
 		c.Next()

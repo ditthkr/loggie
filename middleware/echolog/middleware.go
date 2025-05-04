@@ -14,7 +14,7 @@ func Middleware(logger loggie.Logger) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			ctx, traceId := loggie.WithTraceId(c.Request().Context())
-			ctx = loggie.WithLogger(ctx, logger.With("trace_id", traceId))
+			ctx = loggie.WithLogger(ctx, logger)
 			req := c.Request().WithContext(ctx)
 			c.SetRequest(req)
 			c.Response().Header().Set("X-Trace-Id", traceId)

@@ -13,7 +13,7 @@ func Middleware(logger loggie.Logger) fiber.Handler {
 	}
 	return func(c fiber.Ctx) error {
 		ctx, traceId := loggie.WithTraceId(c.Context())
-		ctx = loggie.WithLogger(ctx, logger.With("trace_id", traceId))
+		ctx = loggie.WithLogger(ctx, logger)
 		c.SetContext(ctx)
 		c.Set("X-Trace-Id", traceId)
 		return c.Next()
