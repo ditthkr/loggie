@@ -34,16 +34,16 @@ func FromContext(ctx context.Context) Logger {
 		logger = defaultLogger
 	}
 
-	fields, _ := ctx.Value(customFieldKey{}).(map[string]any)
-	if len(fields) == 0 {
-		return logger
+	fields := []any{"trace_id", TraceId(ctx)}
+
+	// Add custom fields if any
+	if custom, ok := ctx.Value(customFieldKey{}).(map[string]any); ok {
+		for k, v := range custom {
+			fields = append(fields, k, v)
+		}
 	}
 
-	var kv []any
-	for k, v := range fields {
-		kv = append(kv, k, v)
-	}
-	return logger.With(kv...)
+	return logger.With(fields...)
 }
 
 // DefaultLogger returns the internal fallback logger used when no logger is found.
