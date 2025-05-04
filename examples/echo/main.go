@@ -5,16 +5,27 @@ import (
 	"github.com/ditthkr/loggie"
 	"github.com/ditthkr/loggie/middleware/echolog"
 	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
+	"github.com/sirupsen/logrus"
 	"net/http"
 )
 
 func main() {
-	rawLogger, _ := zap.NewProduction(zap.AddCallerSkip(1))
-	defer rawLogger.Sync()
+
+	// Logrus
+
+	logger := logrus.New()
+	rawLogger := logrus.NewEntry(logger)
 
 	e := echo.New()
-	e.Use(echolog.Middleware(&loggie.ZapLogger{L: rawLogger}))
+	e.Use(echolog.Middleware(&loggie.LogrusLogger{L: rawLogger}))
+
+	// Zap
+
+	//rawLogger, _ := zap.NewProduction(zap.AddCallerSkip(1))
+	//defer rawLogger.Sync()
+	//
+	//e := echo.New()
+	//e.Use(echolog.Middleware(&loggie.ZapLogger{L: rawLogger}))
 
 	e.GET("/ping", func(c echo.Context) error {
 		ctx := c.Request().Context()

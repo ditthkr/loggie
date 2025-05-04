@@ -10,6 +10,17 @@ import (
 )
 
 func main() {
+
+	// Logrus
+
+	//logger := logrus.New()
+	//rawLogger := logrus.NewEntry(logger)
+	//
+	//app := fiber.New()
+	//app.Use(fiberlog.Middleware(&loggie.LogrusLogger{L: rawLogger}))
+
+	// Zap
+
 	rawLogger, _ := zap.NewProduction(zap.AddCallerSkip(1))
 	defer rawLogger.Sync()
 

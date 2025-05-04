@@ -4,23 +4,29 @@ import (
 	"context"
 	"github.com/ditthkr/loggie"
 	"github.com/ditthkr/loggie/middleware/ginlog"
+	"github.com/sirupsen/logrus"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 )
 
 func main() {
-	rawLogger, _ := zap.NewProduction(zap.AddCallerSkip(1))
-	defer func(rawLogger *zap.Logger) {
-		err := rawLogger.Sync()
-		if err != nil {
-			panic(err)
-		}
-	}(rawLogger)
+
+	// Logrus
+
+	logger := logrus.New()
+	rawLogger := logrus.NewEntry(logger)
 
 	r := gin.Default()
-	r.Use(ginlog.Middleware(&loggie.ZapLogger{L: rawLogger}))
+	r.Use(ginlog.Middleware(&loggie.LogrusLogger{L: rawLogger}))
+
+	// Zap
+
+	//rawLogger, _ := zap.NewProduction(zap.AddCallerSkip(1))
+	//defer rawLogger.Sync()
+	//
+	//r := gin.Default()
+	//r.Use(ginlog.Middleware(&loggie.ZapLogger{L: rawLogger}))
 
 	r.GET("/ping", func(c *gin.Context) {
 		ctx := c.Request.Context()
