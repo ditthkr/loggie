@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	rawLogger, _ := zap.NewProduction()
+	rawLogger, _ := zap.NewProduction(zap.AddCallerSkip(1))
 	defer rawLogger.Sync()
 
 	app := fiber.New()

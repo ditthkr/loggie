@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	rawLogger, _ := zap.NewProduction()
+	rawLogger, _ := zap.NewProduction(zap.AddCallerSkip(1))
 	defer func(rawLogger *zap.Logger) {
 		err := rawLogger.Sync()
 		if err != nil {
