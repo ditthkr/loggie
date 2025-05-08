@@ -12,22 +12,22 @@ var traceKey = traceKeyType{}
 
 type customFieldKey struct{}
 
-// WithTraceId returns a new context with a generated or existing trace ID,
-// and the trace ID itself as a string.
+// WithTraceId returns a new context with a generated or existing trace Id,
+// and the trace Id itself as a string.
 //
-// It first checks if a trace ID exists in the context, otherwise it generates a new UUID.
+// It first checks if a trace Id exists in the context, otherwise it generates a new UUId.
 // This function is compatible with both OpenTelemetry-based contexts and local fallback mode.
 func WithTraceId(ctx context.Context) (context.Context, string) {
 	traceId := TraceId(ctx)
 	return context.WithValue(ctx, traceKey, traceId), traceId
 }
 
-// TraceId returns the current trace ID from the context.
+// TraceId returns the current trace Id from the context.
 //
 // It checks the following, in order:
-//  1. If an OpenTelemetry span exists in the context and has a valid TraceID, it is returned.
-//  2. If a local trace ID was previously stored in context via WithTraceID(), it is returned.
-//  3. Otherwise, a new UUID is generated and returned.
+//  1. If an OpenTelemetry span exists in the context and has a valid TraceId, it is returned.
+//  2. If a local trace Id was previously stored in context via WithTraceId(), it is returned.
+//  3. Otherwise, a new UUId is generated and returned.
 func TraceId(ctx context.Context) string {
 	// Check OpenTelemetry span context first
 	if span := trace.SpanFromContext(ctx); span != nil {
