@@ -3,30 +3,26 @@ package main
 import (
 	"context"
 	"github.com/ditthkr/loggie"
-	"github.com/ditthkr/loggie/middleware/ginlog"
-	"github.com/sirupsen/logrus"
-	"net/http"
-
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
+	"net/http"
 )
 
 func main() {
 
-	// Logrus
-
-	logger := logrus.New()
-	rawLogger := logrus.NewEntry(logger)
-
-	r := gin.Default()
-	r.Use(ginlog.Middleware(&loggie.LogrusLogger{L: rawLogger}))
-
 	// Zap
 
-	//rawLogger, _ := zap.NewProduction(zap.AddCallerSkip(1))
-	//defer rawLogger.Sync()
-	//
-	//r := gin.Default()
-	//r.Use(ginlog.Middleware(&loggie.ZapLogger{L: rawLogger}))
+	rawLogger, _ := zap.NewProduction(zap.AddCallerSkip(1))
+	defer rawLogger.Sync()
+
+	r := gin.Default()
+	r.Use(func(c *gin.Context) {
+		ctx, traceId := loggie.Injection(c.Request.Context(), &loggie.ZapLogger{L: rawLogger})
+		c.Request = c.Request.WithContext(ctx)
+		c.Writer.Header().Set("X-Trace-Id", traceId)
+		c.Next()
+	})
 
 	r.GET("/ping", func(c *gin.Context) {
 		ctx := c.Request.Context()

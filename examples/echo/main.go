@@ -3,29 +3,29 @@ package main
 import (
 	"context"
 	"github.com/ditthkr/loggie"
-	"github.com/ditthkr/loggie/middleware/echolog"
 	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"net/http"
 )
 
 func main() {
 
-	// Logrus
-
-	logger := logrus.New()
-	rawLogger := logrus.NewEntry(logger)
-
-	e := echo.New()
-	e.Use(echolog.Middleware(&loggie.LogrusLogger{L: rawLogger}))
-
 	// Zap
 
-	//rawLogger, _ := zap.NewProduction(zap.AddCallerSkip(1))
-	//defer rawLogger.Sync()
-	//
-	//e := echo.New()
-	//e.Use(echolog.Middleware(&loggie.ZapLogger{L: rawLogger}))
+	rawLogger, _ := zap.NewProduction(zap.AddCallerSkip(1))
+	defer rawLogger.Sync()
+
+	e := echo.New()
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			ctx, traceId := loggie.Injection(c.Request().Context(), &loggie.ZapLogger{L: rawLogger})
+			req := c.Request().WithContext(ctx)
+			c.SetRequest(req)
+			c.Response().Header().Set("X-Trace-Id", traceId)
+			return next(c)
+		}
+	})
 
 	e.GET("/ping", func(c echo.Context) error {
 		ctx := c.Request().Context()

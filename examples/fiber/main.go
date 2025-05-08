@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"github.com/ditthkr/loggie"
-	"github.com/ditthkr/loggie/middleware/fiberlog"
 	"github.com/gofiber/fiber/v3"
 	"go.uber.org/zap"
 	"net/http"
@@ -11,21 +10,20 @@ import (
 
 func main() {
 
-	// Logrus
-
-	//logger := logrus.New()
-	//rawLogger := logrus.NewEntry(logger)
-	//
-	//app := fiber.New()
-	//app.Use(fiberlog.Middleware(&loggie.LogrusLogger{L: rawLogger}))
-
 	// Zap
 
 	rawLogger, _ := zap.NewProduction(zap.AddCallerSkip(1))
 	defer rawLogger.Sync()
 
 	app := fiber.New()
-	app.Use(fiberlog.Middleware(&loggie.ZapLogger{L: rawLogger}))
+	//app.Use(fiberlog.Middleware(&loggie.ZapLogger{L: rawLogger}))
+
+	app.Use(func(c fiber.Ctx) error {
+		ctx, traceId := loggie.Injection(c.Context(), &loggie.ZapLogger{L: rawLogger})
+		c.SetContext(ctx)
+		c.Set("X-Trace-Id", traceId)
+		return c.Next()
+	})
 
 	app.Get("/ping", func(c fiber.Ctx) error {
 		ctx := c.Context()
