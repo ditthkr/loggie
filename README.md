@@ -9,7 +9,7 @@ No more passing logger through every function — just use `context.Context`.
 
 `loggie` helps you embed a structured logger inside `context.Context`, so you can log from any layer — service, repository, or handler — with a consistent `trace_id`, `user_id`, or any custom field.
 
-It supports Zap, Logrus (new!), and is ready for OpenTelemetry (OTEL).
+It supports Zap, Logrus, OpenTelemetry, and works with any web framework.
 
 ---
 
@@ -17,12 +17,12 @@ It supports Zap, Logrus (new!), and is ready for OpenTelemetry (OTEL).
 
 ✅ Structured logging via `context.Context`  
 ✅ Auto-generated `trace_id` per request  
-✅ OTEL-compatible (detects `trace_id` from OpenTelemetry spans)  
-✅ Custom fields (e.g. `user_id`, `order_id`)  
-✅ Middleware for Fiber / Gin / Echo  
-✅ Pluggable backends: Zap, Logrus, Slog (soon)  
-✅ Fallback logger included (safe anywhere)  
-✅ Works with Fx lifecycle & `context.WithTimeout`
+✅ OTEL-compatible (extracts `trace_id` from spans)  
+✅ Custom fields via `loggie.WithCustomField()`  
+✅ Framework-agnostic logger injection  
+✅ Zap / Logrus support  
+✅ No-op fallback logger  
+✅ Fx lifecycle and context cancellation compatible
 
 ---
 
@@ -34,21 +34,48 @@ go get github.com/ditthkr/loggie
 
 ---
 
-## 🧱 Architecture
+## 🧠 Injecting Logger in Middleware
 
-```txt
-               ┌────────────────────┐
-               │ context.Context    │
-               └────────┬───────────┘
-                        │
-                ┌───────▼────────┐
-                │ loggie.Logger  │◄── (interface)
-                └───────┬────────┘
-                        │
-        ┌───────────────┼────────────────┐
-        ▼               ▼                ▼
-  ZapLogger        LogrusLogger       SlogLogger
-(✅ ready)         (✅ ready)         (🕓 planned)
+Use `loggie.Injection(ctx, logger)` inside any middleware, from any web framework.
+
+```go
+ctx, traceId := loggie.Injection(req.Context(), logger)
+```
+
+### ✅ Fiber
+
+```go
+app.Use(func(c *fiber.Ctx) error {
+	ctx, traceId := loggie.Injection(c.UserContext(), logger)
+	c.SetUserContext(ctx)
+	c.Set("X-Trace-Id", traceId)
+	return c.Next()
+})
+```
+
+### ✅ Gin
+
+```go
+r.Use(func(c *gin.Context) {
+	ctx, traceId := loggie.Injection(c.Request.Context(), logger)
+	c.Request = c.Request.WithContext(ctx)
+	c.Writer.Header().Set("X-Trace-Id", traceId)
+	c.Next()
+})
+```
+
+### ✅ Echo
+
+```go
+e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		ctx, traceId := loggie.Injection(c.Request().Context(), logger)
+		req := c.Request().WithContext(ctx)
+		c.SetRequest(req)
+		c.Response().Header().Set("X-Trace-Id", traceId)
+		return next(c)
+	}
+})
 ```
 
 ---
@@ -63,102 +90,29 @@ type Logger interface {
 }
 ```
 
-> You can plug any logger backend by implementing this interface.
+### ✅ Supported Adapters
+
+| Logger | Package               |
+| ------ | --------------------- |
+| Zap    | `loggie.ZapLogger`    |
+| Logrus | `loggie/logruslogger` |
 
 ---
 
-## ⚙️ Middleware Usage
-
-### Fiber + Zap
+## 📄 Usage Example
 
 ```go
-import (
-    "github.com/ditthkr/loggie"
-    "github.com/ditthkr/loggie/middleware/fiberlog"
-    "go.uber.org/zap"
-    "github.com/gofiber/fiber/v3"
-)
-
-func main() {
-    rawLogger, _ := zap.NewProduction()
-    defer rawLogger.Sync()
-
-    adapter := &loggie.ZapLogger{L: rawLogger}
-    app := fiber.New()
-    app.Use(fiberlog.Middleware(adapter))
-
-    app.Get("/ping", func(c *fiber.Ctx) error {
-        log := loggie.FromContext(c.UserContext())
-        log.Info("Ping received", "path", c.Path())
-        return c.SendString("pong")
-    })
-
-    app.Listen(":8080")
-}
-```
-
-### Fiber + Logrus
-
-```go
-import (
-    "github.com/sirupsen/logrus"
-    "github.com/ditthkr/loggie/logruslogger"
-    "github.com/ditthkr/loggie/middleware/fiberlog"
-)
-
-
-func main() {
-    logger := logrus.New()
-	
-    adapter := &logruslogger.LogrusLogger{L: logrus.NewEntry(logger)}
-    app := fiber.New()
-    app.Use(fiberlog.Middleware(adapter))
-    
-    app.Get("/ping", func(c *fiber.Ctx) error {
-        log := loggie.FromContext(c.UserContext())
-        log.Info("Ping received", "path", c.Path())
-        return c.SendString("pong")
-    })
-    
-    app.Listen(":8080")
-}
-```
-
----
-
-## 🌐 OTEL Support (OpenTelemetry)
-
-If you're using OpenTelemetry, `loggie` will **automatically extract `trace_id` from span context**
-via `go.opentelemetry.io/otel/trace`.
-
-No config required — just pass the OTEL-injected `context.Context`.
-
-```go
-ctx := r.Context() // contains OTEL span
 log := loggie.FromContext(ctx)
-
-log.Info("Received payment webhook")
-// trace_id will match what's in OTEL system (Jaeger, Tempo, etc)
+log.Info("Order created", "user_id", 123)
 ```
 
----
-
-## ✍️ Custom Fields
-
-```go
-ctx = loggie.WithCustomField(ctx, "user_id", 42)
-
-log := loggie.FromContext(ctx)
-log.Info("Order created")
-```
-
-📤 Output:
+📤 Output (Zap or Logrus):
 
 ```json
 {
   "msg": "Order created",
-  "trace_id": "abc-xyz",
-  "user_id": 42
+  "trace_id": "...",
+  "user_id": 123
 }
 ```
 
@@ -166,47 +120,28 @@ log.Info("Order created")
 
 ## 🧰 Utilities
 
-| Function                         | Purpose                           |
-| -------------------------------- | --------------------------------- |
-| `FromContext(ctx)`               | Retrieves logger from context     |
-| `WithLogger(ctx, logger)`        | Injects a logger                  |
-| `WithTraceID(ctx)`               | Adds `trace_id` to context        |
-| `TraceID(ctx)`                   | Retrieves `trace_id` (OTEL-aware) |
-| `WithCustomField(ctx, key, val)` | Adds structured field             |
-| `DefaultLogger()`                | No-op fallback logger             |
+| Function                         | Description                        |
+| -------------------------------- | ---------------------------------- |
+| `Injection(ctx, logger)`      | Inject logger + trace\_id into ctx |
+| `FromContext(ctx)`               | Get logger with fields from ctx    |
+| `WithTraceId(ctx)`               | Add trace\_id manually             |
+| `TraceId(ctx)`                   | Get trace\_id (auto or OTEL)       |
+| `WithLogger(ctx, logger)`        | Attach logger                      |
+| `WithCustomField(ctx, key, val)` | Add any key-value field            |
+| `DefaultLogger()`                | Get fallback no-op logger          |
 
 ---
 
-## 📁 Middleware Support
+## 🌐 OpenTelemetry Support
 
-| Framework | Import Path                                     | Function                |
-| --------- | ----------------------------------------------- | ----------------------- |
-| Fiber     | `github.com/ditthkr/loggie/middleware/fiberlog` | `fiberlog.Middleware()` |
-| Gin       | `github.com/ditthkr/loggie/middleware/ginlog`   | `ginlog.Middleware()`   |
-| Echo      | `github.com/ditthkr/loggie/middleware/echolog`  | `echolog.Middleware()`  |
-
-All middlewares are generic and support any `loggie.Logger`.
-
----
-
-## 🔌 Logger Adapters
-
-| Logger | Status      | Package                        |
-| ------ | ----------- | ------------------------------ |
-| Zap    | ✅ Supported | `loggie.ZapLogger`             |
-| Logrus | ✅ Supported | `loggie/logruslogger`          |
-| Slog   | 🕓 Planned  | `loggie/slogger` (coming soon) |
-
----
-
-## 🧪 Testing & Fallbacks
-
-Even without injecting a logger, `loggie` will still work with a **safe no-op fallback**:
+If a context already contains an OTEL span, loggie will extract its `trace_id`:
 
 ```go
-log := loggie.FromContext(context.Background())
-log.Info("This is safe even without a logger")
+span := trace.SpanFromContext(ctx)
+traceId := span.SpanContext().TraceId().String()
 ```
+
+You don’t need to do anything extra — `TraceId(ctx)` handles it automatically.
 
 ---
 
